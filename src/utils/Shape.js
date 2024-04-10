@@ -167,6 +167,20 @@ export class Shape {
 
     }
 
+    svg(path,options){
+      this.type = "svg"
+      let p = new Path2D(path)
+      this.ctx.fill(p)
+
+      const ele ={
+        path: path,
+        type: this.type,
+        ctx: this.ctx,
+        options: (options ? options : this.options)
+      }
+      return ele
+    }
+
     draw(elements){
       if(elements.length ==0 ){
         return
@@ -185,6 +199,9 @@ export class Shape {
             return this.ellipse(el.x1,el.y1,el.x2,el.y2,el.options)
           case "polygon":
             return this.polygon(el.points,el.options)
+          case "svg":
+            return this.svg(el.path,el.options)
+
           default:
             return
         }
