@@ -167,6 +167,28 @@ export class Shape {
 
     }
 
+    textBox(x,y,text,width,options){
+      this.type = "text"
+      this.text = text
+      this.x = x
+      this.y = y
+
+      this.ctx.font = "48px serif"
+      width = width ? width : text.length*100
+      this.ctx.fillText(text,x,y,width)
+      
+      const ele = {
+        x: this.x,
+        y: this.y,
+        text: this.text,
+        type : this.type,
+        ctx: this.ctx,
+        options: (options ? options : this.options)
+      }
+
+      return ele
+    }
+
     svg(path,options){
       this.type = "svg"
       let p = new Path2D(path)
@@ -186,6 +208,9 @@ export class Shape {
         return
       }
       elements.map((el, i) => {
+        if(!el){
+          return
+        }
         const shape = el.type
 
         switch(shape){
@@ -201,6 +226,8 @@ export class Shape {
             return this.polygon(el.points,el.options)
           case "svg":
             return this.svg(el.path,el.options)
+          case "text":
+            return this.textBox(el.x,el.y,el.text,el.width,el.options)
 
           default:
             return

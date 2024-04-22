@@ -2,43 +2,8 @@
 import { useRef,useEffect,useState } from 'react'
 import { Shape } from '../utils/Shape';
 import { getStroke } from 'perfect-freehand'
+import { getSvgPathFromStroke } from '../utils/getSvgPathFromStroke';
 
-// Declaration
-
-const average = (a, b) => (a + b) / 2
-
-function getSvgPathFromStroke(points, closed = true) {
-  const len = points.length
-
-  if (len < 4) {
-    return ``
-  }
-
-  let a = points[0]
-  let b = points[1]
-  const c = points[2]
-
-  let result = `M${a[0].toFixed(2)},${a[1].toFixed(2)} Q${b[0].toFixed(
-    2
-  )},${b[1].toFixed(2)} ${average(b[0], c[0]).toFixed(2)},${average(
-    b[1],
-    c[1]
-  ).toFixed(2)} T`
-
-  for (let i = 2, max = len - 1; i < max; i++) {
-    a = points[i]
-    b = points[i + 1]
-    result += `${average(a[0], b[0]).toFixed(2)},${average(a[1], b[1]).toFixed(
-      2
-    )} `
-  }
-
-  if (closed) {
-    result += 'Z'
-  }
-
-  return result
-}
 
 const drawElement= (generator, shape, x1,y1,x2,y2,options) => {
 
@@ -57,18 +22,33 @@ const drawElement= (generator, shape, x1,y1,x2,y2,options) => {
 
 }
 
+const drawSVG = (pts,ctx,options) => {
+  if(!pts || !ctx){
+    return
+  }
+  const outlinePoints = getStroke(pts,{size: 12})
+  const pathData = getSvgPathFromStroke(outlinePoints)
+  const temp = new Shape(ctx)
+  return temp.svg(pathData,options)
+}
+
 
 function Canvas() {
     const canvasRef = useRef(null)
+    const inputRef = useRef(null)
     // const [options,setOptions] = useState({})
-    const [elements,setElements] = useState([[]])
-    const [tool, setTool] = useState('brush')
+    const [elements,setElements] = useState([])
+    const [tool, setTool] = useState('none')
     const [action, setAction] = useState('none')
     const [points,setPoints] = useState([])
+    const [currText, setCurrText] = useState('')
+    const [currElement, setCurrElement] = useState(null)
 
     useEffect(()=>{
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d')
+        ctx.height = window.innerHeight
+        ctx.width = window.innerWidth
 
         ctx.clearRect(0,0,canvas.width,canvas.height);
         ctx.fillStyle = "green";
@@ -90,25 +70,48 @@ function Canvas() {
         // const rect = generator.rectangle(200,200, 400, 400, options,)
         // const rect = generator.rectangle(597,217,825,366,options)
         // ctx.clearRect(0,0,canvas.width, canvas.height)
+        // generator.textBox(100,100, "Hello world")
         
+        console.log(elements)
         generator.draw(elements)
 
-
-        // console.log(generator.draw())
-
-
-      //   generator.draw(ele)
-
-        // generator.draw(elements)
-
         const onMouseDown = (e) => {
-          
+          if(tool === 'none'){
+            return
+          }
+          e.preventDefault()
           setAction("drawing")
+          if(!e){
+            return
+          }
           const {clientX, clientY} = e
 
-          if(tool === 'brush'){
-            setPoints([])
-            setPoints([[clientX,clientY]])
+          if(tool === 'text'){
+            setAction("typing")
+            
+            //creating element for text box
+            const temp = new Shape(ctx)
+            const finalEle = temp.textBox(clientX,clientY,currText)
+            setElements(prev => [...prev, finalEle])
+            setCurrElement(finalEle)
+
+          }
+          
+          else if(tool === 'brush'){
+            const pts = [[clientX,clientY]]
+            setPoints(pts)
+
+            // const outlinePoints = getStroke(pts)
+            // const pathData = getSvgPathFromStroke(outlinePoints)
+            // const temp = new Shape(ctx)
+            // const newSvg = temp.svg(pathData,options)
+
+            const newSvg = drawSVG(points,ctx,options)
+            console.log(newSvg)
+
+            setElements(prev => [...prev, newSvg])
+            setCurrElement(newSvg)
+            // console.log(elements)
 
           }
           else{
@@ -118,6 +121,7 @@ function Canvas() {
             const l = drawElement(temp,tool,clientX,clientY,clientX,clientY,options)
             
             setElements(prev => [...prev,l])
+            setCurrElement(l)
             
             return
           }
@@ -127,18 +131,21 @@ function Canvas() {
         
 
         const onMouseMove = (e) => {
+          e.preventDefault()
           const {clientX, clientY} = e
 
-          if(action === 'none'){
+          if(action === 'none' || action === "typing"){
             return
           }
           
           if(tool === 'brush'){
             setPoints(prev => [...prev, [clientX,clientY]])
             
-            const outlinePoints = getStroke(points)
-            const pathData = getSvgPathFromStroke(outlinePoints)
-            const newSvg = generator.svg(pathData,options)
+            if(!elements){
+              return
+            }
+
+            const newSvg = drawSVG(points,ctx,options)
             const n = elements.length-1
             
             const updateEle = [...elements]
@@ -165,20 +172,26 @@ function Canvas() {
         }
 
         const onMouseUp = (e) => {
+          e.preventDefault()
           if(action === 'none'){
             return
           }
-          // console.log(elements)
+          
           const {clientX, clientY} = e
+
+          if(tool === 'text'){
+            return
+          }
 
           if(tool === 'brush'){
             setPoints(prev => [...prev, [clientX,clientY]])
-            const outlinePoints = getStroke(points)
-            const pathData = getSvgPathFromStroke(outlinePoints)
-            const newSvg = generator.svg(pathData,options)
 
-            setElements(prev => [...prev, newSvg])
-            setPoints(null)
+            const newSvg = drawSVG(points,ctx,options)
+            const n = elements.length-1
+            
+            const updateEle = [...elements]
+            updateEle[n] = newSvg
+            setElements(updateEle)
           }
           
           else{
@@ -198,31 +211,83 @@ function Canvas() {
           }
           setAction('none')
           return
-          // console.log(e.clientX,e.clientY)
+        }
+
+        const onKeyDown = (e) => {
+          if(action !== 'typing'){
+            return
+          }
+
+          if(e.key === 'Enter'){
+            const temp = new Shape(ctx)
+            const n = elements.length-1
+            
+            const currEle = [...elements]
+            const {x,y} = currEle[n]
+            const finalEle = temp.textBox(x,y+40,currText)
+
+            currEle[n] = finalEle
+            setElements(currEle)
+
+            setAction('none')
+            setCurrText('')
+            return
+          }
         }
 
         canvas.addEventListener('mousedown', onMouseDown)
         document.addEventListener('mouseup', onMouseUp)
         canvas.addEventListener('mousemove', onMouseMove)
+        document.addEventListener('keydown', onKeyDown)
 
         return() => {
           canvas.removeEventListener('mousedown', onMouseDown)
           document.removeEventListener('mouseup', onMouseUp)
           canvas.removeEventListener('mousemove', onMouseMove)
+          document.removeEventListener('keydown', onKeyDown)
 
         }
 
-    },[action,elements,points])
+    },[action,elements,points,tool,currText, currElement])
+
+    useEffect(() => {
+      const textInput = inputRef.current
+      if(!textInput)  return
+      if(action === 'typing'){
+        textInput.focus()
+        const n = elements.length-1
+        const {x,y} = elements[n]
+
+        textInput.style.top = y
+        textInput.style.left = x
+      }
+    }, [action,currElement])
+
+    const handleChange = (e) => {
+        setCurrText(e.target.value)
+    }
 
   return (
     <>
-    <div className='absolute z-10'>
-      <button onClick={()=>setTool('brush')} className='m-2'>brush</button>
-      <button onClick={()=>setTool('rectangle')} className='m-2'>rectangle</button>
-      <button onClick={()=>setTool('line')} className='m-2'>line</button>
-      <button onClick={()=>setTool('ellipse')} className='m-2'>ellipse</button>
+    <div className='absolute z-10 bg-zinc-500 left-[50%]'>
+      <div>
+
+        <button onClick={()=>setTool('brush')} className='m-2 text-white'>brush</button>
+        <button onClick={()=>setTool('text')} className='m-2 text-white'>text</button>
+        <button onClick={()=>setTool('rectangle')} className='m-2 text-white'>rectangle</button>
+        <button onClick={()=>setTool('line')} className='m-2 text-white'>line</button>
+        <button onClick={()=>setTool('ellipse')} className='m-2 text-white'>ellipse</button>
+      </div>
     </div>
-      <canvas ref={canvasRef} id='canvas' height={window.innerHeight} width={window.innerWidth} className=' relative bg-zinc-800'></canvas>
+      {
+        action === 'typing' && 
+          <input ref={inputRef} className={`bg-white w-auto h-10 fixed z-10 border-none focus:outline-none font-serif text-4xl`}
+           style={{top:currElement.y, left:currElement.x, width: currText.length > 21 ? currText.length*20 : '394px'}}
+           onChange={handleChange} />
+
+      }
+      <canvas ref={canvasRef} id='canvas' height={window.innerHeight} width={window.innerWidth} className=' relative'>
+      </canvas>
 
     </>
   )
