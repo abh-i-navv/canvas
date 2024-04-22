@@ -36,13 +36,13 @@ const drawSVG = (pts,ctx,options) => {
 function Canvas() {
     const canvasRef = useRef(null)
     const inputRef = useRef(null)
-    // const [options,setOptions] = useState({})
     const [elements,setElements] = useState([])
     const [tool, setTool] = useState('none')
     const [action, setAction] = useState('none')
     const [points,setPoints] = useState([])
     const [currText, setCurrText] = useState('')
     const [currElement, setCurrElement] = useState(null)
+    
 
     useEffect(()=>{
         const canvas = canvasRef.current
@@ -52,14 +52,12 @@ function Canvas() {
 
         ctx.clearRect(0,0,canvas.width,canvas.height);
         ctx.fillStyle = "green";
-        // ctx.fillRect(10,10,100,100)
 
         const options = {
           strokeStyle: "green",
           lineWidth: 5,
           lineJoin: "bevel"
         }
-        // setOptions(newOptions)
        
 
         const generator = new Shape(ctx)
@@ -101,17 +99,12 @@ function Canvas() {
             const pts = [[clientX,clientY]]
             setPoints(pts)
 
-            // const outlinePoints = getStroke(pts)
-            // const pathData = getSvgPathFromStroke(outlinePoints)
-            // const temp = new Shape(ctx)
-            // const newSvg = temp.svg(pathData,options)
 
             const newSvg = drawSVG(points,ctx,options)
             console.log(newSvg)
 
             setElements(prev => [...prev, newSvg])
             setCurrElement(newSvg)
-            // console.log(elements)
 
           }
           else{
