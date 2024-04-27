@@ -119,11 +119,14 @@ export class Shape {
       this.type = "ellipse"
       this.style(options)
 
-      const major = Math.max(x2-x1,y2-y1)
-      const minor = Math.min(x2-x1,y2-y1)
+      const ax1 = x2-x1
+      const ax2 = y2-y1
+
+      const major = Math.max(ax1,ax2)
+      const minor = Math.min(ax1,ax2)
 
       this.ctx.beginPath()
-      this.ctx.ellipse((x1+x2)/2, (y1+y2)/2, Math.abs(major), Math.abs(minor), 0, 0, 2 * Math.PI)
+      this.ctx.ellipse((x1+x2)/2, (y1+y2)/2, Math.abs(major)/2, Math.abs(minor)/2, 0, 0, 2 * Math.PI)
       this.ctx.stroke()
       const ele = {
         x1:this.x1,
