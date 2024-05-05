@@ -81,6 +81,7 @@ function Canvas() {
         ctx.restore()
         
         const onMouseDown = (e) => {
+          e.preventDefault()
           if(currentTool === 'none'){
             return
           }
@@ -281,7 +282,7 @@ function Canvas() {
     </div> */}
       {
         action === 'typing' && 
-          <input ref={inputRef} className={`bg-white w-auto h-10 fixed z-10 border-none focus:outline-none font-serif text-4xl`}
+          <input ref={inputRef} className={`bg-white w-auto h-10 z-10 border-none focus:outline-none font-serif text-4xl`}
            style={{top:currElement.y, left:currElement.x, width: currText.length > 21 ? currText.length*20 : '394px'}}
            onChange={handleChange} />
 

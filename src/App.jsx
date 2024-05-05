@@ -1,4 +1,4 @@
-import { useState,useRef } from 'react'
+import { useState,useRef, useEffect } from 'react'
 import Canvas from './components/Canvas'
 import { DrawProvider } from './context/useDraw'
 import ToolBar from './components/Toolbar'
@@ -14,6 +14,7 @@ function App() {
   const [isMoving, setMoving] = useState([])
   const [scale, setScale] = useState(1)
 
+
   return (
     <DrawProvider value={{elements,setElements, currentTool, setCurrentTool, setStroke, stroke,
       setStrokeWidth, strokeWidth, roughness, setRoughness, elementHistory, setElementHistory, isMoving, setMoving,scale, setScale,canvasRef}}>
@@ -26,10 +27,6 @@ function App() {
               <Canvas />
             </div>
           </div>
-    {/* <div className='absolute'>
-      <ToolBar />
-      <Canvas />
-    </div> */}
     </>
     </DrawProvider>
   )
