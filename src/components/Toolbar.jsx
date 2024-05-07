@@ -14,6 +14,7 @@ import { MdPanTool } from "react-icons/md";
 import { FaPlus } from "react-icons/fa6";
 import { FaMinus } from "react-icons/fa6";
 import { IconContext } from 'react-icons';
+import { FaMousePointer } from "react-icons/fa";
 import { MdOutlineHorizontalRule } from "react-icons/md";
 import SideBar from './SideBar';
 
@@ -68,8 +69,14 @@ function ToolBar() {
         {/* <div className={`cursor-pointer m-2 p-2 flex items-center justify-center hover:bg-[#b3aad5] ${currentTool === 'moving' ? 'bg-[#b3aad5]' : ''} `} onClick={() => {setCurrentTool('moving')}}>
           <RiDragMove2Fill />
         </div> */}
-        <div className={`cursor-pointer m-2 p-2 flex items-center justify-center hover:bg-[#b3aad5] ${currentTool === 'pan' ? 'bg-[#b3aad5]' : ''}`} onClick={() => {setCurrentTool('pan')}}>
+        <div className={`cursor-pointer m-2 p-2 flex items-center justify-center hover:bg-[#b3aad5] ${currentTool === 'move' ? 'bg-[#b3aad5]' : ''}`} onClick={() => {setCurrentTool('move')}}>
+          <FaMousePointer />
+        </div>
+        {/* <div className={`cursor-pointer m-2 p-2 flex items-center justify-center hover:bg-[#b3aad5] ${currentTool === 'pan' ? 'bg-[#b3aad5]' : ''}`} onClick={() => {setCurrentTool('pan')}}>
           <MdPanTool />
+        </div> */}
+        <div className={`cursor-pointer m-2 p-2 flex items-center justify-center hover:bg-[#b3aad5] ${currentTool === 'text' ? 'bg-[#b3aad5]' : ''}`} onClick={() => {setCurrentTool('text')}}>
+          Text
         </div>
 
         <div className={`cursor-pointer m-2 p-2 flex items-center justify-center hover:bg-[#b3aad5] ${currentTool === 'brush' ? 'bg-[#b3aad5]' : ''}`} onClick={()=>{setCurrentTool('brush')}} >
@@ -103,7 +110,7 @@ function ToolBar() {
 
         <div className='flex flex-col items-center m-2'>
             <span className='justify-center select-none'>Width</span>
-            <input type='range' min={1} max={50} value={strokeWidth} className='w-20 bg-[#7566b0]' onChange={(e) => {setStrokeWidth(e.target.value)}} ></input>
+            <input type='range' min={1} max={30} value={strokeWidth} className='w-20 bg-[#7566b0]' onChange={(e) => {setStrokeWidth(e.target.value)}} ></input>
         </div>
         
 

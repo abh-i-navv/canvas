@@ -27,10 +27,139 @@ const drawSVG = (pts,ctx,options) => {
   if(!pts || !ctx){
     return
   }
-  const outlinePoints = getStroke(pts,{size: 12})
+  const thickness=  options.lineWidth >5 ? options.lineWidth : 5
+  
+  const outlinePoints = getStroke(pts,{size: thickness,stroke: options.strokeStyle, fill: options.strokeStyle})
   const pathData = getSvgPathFromStroke(outlinePoints)
   const temp = new Shape(ctx)
-  return temp.svg(pathData,options)
+  return temp.svg(pathData,pts,options)
+}
+
+function cartesianDistance(x1,y1, x2,y2){
+  return Math.round((Math.sqrt(Math.pow(y2-y1,2) + Math.pow(x2-x1,2))))
+}
+
+ // for finding if a element exists on the given point
+ const elementFinder = (x,y,element) => {
+  const {x1,y1,x2,y2,type} = element
+
+  // Line -> AB, to check if a point P lies on line => dist(AB) = dist(AP) + dist(PB)
+  if(type === 'line'){
+    const lineDist = cartesianDistance(x1,y1,x2,y2)
+    const pointDist = cartesianDistance(x,y,x1,y1) + cartesianDistance(x,y,x2,y2)
+    if( lineDist === pointDist){
+      return element
+    }
+  }
+  
+  // checking for rectangle and ellipse
+  else if(type === 'rectangle' || type === 'ellipse'){
+    const maxX = Math.max(x1,x2)
+    const maxY = Math.max(y1,y2)
+    const minX = Math.min(x1,x2)
+    const minY = Math.min(y1,y2)
+    
+    // if(action === 'erasing'){
+    //   if((x <= maxX+10 && x >= minX-10 && y<= maxY+10 && y>=minY-10) &&
+    //     ((Math.abs(x-minX) < 10 && y<=maxY && y>=minY) || (Math.abs(x-maxX) < 10 && y<=maxY && y>=minY) || 
+    //     (Math.abs(y-minY) < 10 && x<=maxX && x>=minX) || (Math.abs(y-maxY) < 10 && x<=maxX && x>=minX))){
+    //     return element
+    //   }
+    // }
+    {          
+      if(x <= maxX && x >= minX && y<= maxY && y>=minY){
+        
+        return element
+      }
+      
+    }
+  }
+
+  //if point P lies inside triangle => area(ABC) = area(PAB) + area(PAC) + area(PBC)
+  else if(type === 'triangle'){
+    const {pts} = element
+    const A = pts[0]
+    const B = pts[1]
+    const C = pts[2]
+    const P = [x,y]
+
+    const area = (x1,y1,x2,y2,x3,y3) => {
+      // Area A = [ x1(y2 – y3) + x2(y3 – y1) + x3(y1-y2)]/2 
+      return Math.abs((x1*(y2-y3) + x2*(y3-y1)+ x3*(y1-y2))/2.0)
+    }
+    const originalArea = area(A[0],A[1],B[0],B[1],C[0],C[1])
+    const testArea = area(P[0],P[1],A[0],A[1],B[0],B[1]) + area(P[0],P[1],B[0],B[1],C[0],C[1]) + area(P[0],P[1],A[0],A[1],C[0],C[1])
+
+    if(originalArea === testArea) return  element
+  }
+
+  else if(type=== 'rhombus'){
+    const {pts} = element
+
+    function inside(point, vs) {
+      // ray-casting algorithm based on
+      // https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
+      
+      var x = point[0], y = point[1];
+      
+      var inside = false;
+      for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+          var xi = vs[i][0], yi = vs[i][1];
+          var xj = vs[j][0], yj = vs[j][1];
+          
+          var intersect = ((yi > y) != (yj > y))
+              && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+      }
+      
+      return inside;
+  }
+
+    if(inside([ x, y ], pts)){
+      return element
+    }
+  }
+  else if(type === 'svg'){
+    
+    const {pointsArr} = element
+
+    for(let i =0; i<pointsArr.length; i++){
+
+      const currX = pointsArr[i][0]
+      const currY = pointsArr[i][1]
+
+      if(Math.abs(currX-x) <=10 && Math.abs(currY-y) <= 10){
+        const obj = {element:element, X: currX, Y: currY}
+        return obj        
+      }
+    }
+
+  }
+
+  else if(type === 'text'){
+    const elX = element.x
+    const elY = element.y-40
+
+    const x1 = elX
+    const y1 = elY
+    const x2 = elX+element.width
+    const y2 = elY+40
+    
+    const maxX = Math.max(x1,x2)
+    const maxY = Math.max(y1,y2)
+    const minX = Math.min(x1,x2)
+    const minY = Math.min(y1,y2)
+
+    if(x <= maxX && x >= minX && y<= maxY && y>=minY){
+      return element
+    }
+  }
+  
+}
+
+//looping through each element and checking if point P lies on the element
+const findElement = (x,y,elements) => {
+  return (elements.find(element => elementFinder(x,y,element)))
 }
 
 
@@ -41,7 +170,9 @@ function Canvas() {
     const [tool, setTool] = useState('none')
     const [action, setAction] = useState('none')
     const [points,setPoints] = useState([])
+    const [movingElement, setMovingElement] = useState(null)
     const [currText, setCurrText] = useState('')
+    const [initialPoints, setInitialPoints] = useState({x:0, y:0})
     const [currElement, setCurrElement] = useState(null)
     const [panOffset, setPanOffset] = useState({x:0, y:0})
     const [scaleOffset,setScaleOffset] = useState({x:0, y:0})
@@ -50,23 +181,32 @@ function Canvas() {
       roughness, currentTool,setCurrentTool,elemenHistory, setElementHistory, isMoving, setMoving,scale, setScale,canvasRef} = useDraw()
   
     
-
-    useEffect(()=>{
+      
+      useEffect(()=>{
         const canvas = canvasRef.current
         const ctx = canvas.getContext('2d')
         ctx.height = window.innerHeight
         ctx.width = window.innerWidth
-
         ctx.clearRect(0,0,canvas.width,canvas.height);
-
+        
         const options = {
-          strokeStyle: "black",
-          lineWidth: 5,
-          lineJoin: "bevel"
-        }
-       
+          strokeStyle: stroke,
+          lineWidth: strokeWidth,
+          lineJoin: "bevel",
+          panOffset: panOffset
+        } 
+        const generator = new Shape(ctx,options)
 
-        const generator = new Shape(ctx)
+        const scaleWidth = canvas.width * scale
+        const scaleHeight = canvas.height * scale
+        const scaleOffsetX = (scaleWidth - canvas.width)/2
+        const scaleOffsetY = (scaleHeight - canvas.height)/2
+        setScaleOffset({x:scaleOffsetX, y:scaleOffsetY})
+
+        ctx.save()
+        ctx.translate(panOffset.x*scale - scaleOffsetX, panOffset.y*scale -scaleOffsetY)
+        
+        ctx.scale(scale,scale)       
 
         // var pts=[ [5,5], [100,50], [150,200], [60,500]];
         // const poly = generator.polygon(pts,options)
@@ -79,68 +219,198 @@ function Canvas() {
         // console.log(elements)
         generator.draw(elements)
         ctx.restore()
-        
+
+        //mouse down event
         const onMouseDown = (e) => {
           e.preventDefault()
           if(currentTool === 'none'){
             return
           }
-          e.preventDefault()
-          setAction("drawing")
+
           if(!e){
             return
           }
-          const {clientX, clientY} = e
+          // const {clientX, clientY} = e
+
+          // calculating the coordinates with reference to canvas
+          let x = (e.clientX - panOffset.x*scale + scaleOffsetX)/scale 
+          let y = (e.clientY - panOffset.y*scale + scaleOffsetY)/scale
+          
+          if(e.type === 'touchstart'){
+            x = (e.touches[0].clientX - panOffset.x*scale + scaleOffsetX)/scale 
+            y = (e.touches[0].clientY - panOffset.y*scale + scaleOffsetY)/scale
+          }
 
           if(currentTool === 'text'){
             setAction("typing")
             
             //creating element for text box
             const temp = new Shape(ctx)
-            const finalEle = temp.textBox(clientX,clientY,currText)
+            const finalEle = temp.textBox(x,y,currText,options)
             setElements(prev => [...prev, finalEle])
+            finalEle.realX = e.clientX
+            finalEle.realY = e.clientY
+            // console.log(finalEle)
             setCurrElement(finalEle)
 
           }
-          
-          else if(currentTool === 'brush'){
-            const pts = [[clientX,clientY]]
-            setPoints(pts)
+          else if(currentTool === 'move'){
+            setAction('moving')
+
+            if(elements){
+    
+              //getting the element at the point x,y
+              const currElement = findElement(x,y, elements)  
+              if(currElement){
+                if(currElement.type ==='svg'){
+                  const {pointsArr} = currElement
+                  setPoints(pointsArr)
+                  let offsetX = pointsArr.map(point => x - point[0]) 
+                  let offsetY = pointsArr.map(point => y - point[1])  
+              
+                  setMovingElement([currElement,offsetX,offsetY])
+                }
+                else if(currElement.type === 'text'){
+                  const offsetX = x-currElement.x
+                  const offsetY = y-currElement.y
+                  setMovingElement([currElement,offsetX,offsetY])
+                }
+                else{
+                  const offsetX = x-currElement.x1
+                  const offsetY = y-currElement.y1
+                  setMovingElement([currElement,offsetX,offsetY]) //Data of selected element at point x,y
+                }
+                
+              }
+            }
 
 
-            const newSvg = drawSVG(points,ctx,options)
-            console.log(newSvg)
-
-            setElements(prev => [...prev, newSvg])
-            setCurrElement(newSvg)
-
+          }
+          else if(currentTool === 'pan'){
+            setAction('panning')
+            setInitialPoints({x:x, y:y})
           }
           else{
 
-            const temp = new Shape(ctx,options)
-            
-            const l = drawElement(temp,currentTool,clientX,clientY,clientX,clientY,options)
-            
-            setElements(prev => [...prev,l])
-            setCurrElement(l)
-            
-            return
+            setAction('drawing')
+            if(currentTool === 'brush'){
+              const pts = [[x,y]]
+              setPoints(pts)
+              
+              
+              const newSvg = drawSVG(points,ctx,options)
+              
+              setElements(prev => [...prev, newSvg])
+              setCurrElement(newSvg)
+              
+            }
+            else{
+              const temp = new Shape(ctx,options)
+              
+              const l = drawElement(temp,currentTool,x,y,x,y,options,strokeWidth)
+              
+              setElements(prev => [...prev,l])
+              setCurrElement(l)
+              
+              return
+            }
           }
              
         }
-        
-        
 
         const onMouseMove = (e) => {
           e.preventDefault()
-          const {clientX, clientY} = e
+          // const {clientX, clientY} = e
 
-          if(action === 'none' || action === "typing"){
+          // calculating the coordinates with reference to canvas
+          let x = (e.clientX - panOffset.x*scale + scaleOffsetX)/scale 
+          let y = (e.clientY - panOffset.y*scale + scaleOffsetY)/scale
+          
+          if(e.type === 'touchstart'){
+            x = (e.touches[0].clientX - panOffset.x*scale + scaleOffsetX)/scale 
+            y = (e.touches[0].clientY - panOffset.y*scale + scaleOffsetY)/scale
+          }
+
+          if(action === 'none' || action === "typing" || currentTool === 'none'){
             return
           }
-          
-          if(currentTool === 'brush'){
-            setPoints(prev => [...prev, [clientX,clientY]])
+          else if(currentTool === 'pan' && action === 'panning'){
+            setPanOffset(prev => ({x:prev.x+(x-initialPoints.x), y:prev.y + (y-initialPoints.y)}))
+            return
+          }
+          else if(currentTool === 'move' && action === 'moving'){
+            
+            if(!movingElement)  return
+            const type = movingElement[0].type // geting shape type
+            if(!type) return
+            
+            const {id} = movingElement[0]
+            let n;
+            elements.find((el,idx) => {
+              if(el.id === id){
+                n= idx
+              }
+            })
+
+            if(type === 'svg'){
+              
+              // const updateEle = [...elements]
+              
+              // let pts = [...points]
+              // // console.log(updateEle[n])
+              
+              // let offsetX = movingElement[1]
+              // let offsetY = movingElement[2]
+
+              
+              // for(let  i=0; i < pts.length; i++){
+              //   pts[i][0] = x-offsetX[i]
+              //   pts[i][1] = y-offsetY[i]
+              // }              
+
+              // const newSvg = drawSVG(pts,ctx,options)
+              
+              // updateEle[n] = newSvg
+              // setElements(updateEle)
+
+              // console.log(selectedEle,pts)
+
+              // setPoints(pointsArr)
+              // updateElement(id-1,type,pointsArr[0][0],pointsArr[0][1],pointsArr[1][0], pointsArr[1][1], options,pointsArr)
+              
+            }
+            
+           if(type && type != 'svg'){
+              const newX = (x-movingElement[1])
+              const newY = (y-movingElement[2])
+
+                const {id,type, x1,y1,x2,y2} = movingElement[0]
+                // console.log(id)
+                
+
+                const updateEle = [...elements]
+                const selectedEle = updateEle[n]
+                
+                if(type === 'text'){
+                  
+                  selectedEle.x = newX
+                  selectedEle.y= newY
+                }
+
+                else{
+                  selectedEle.x1 = newX
+                  selectedEle.y1= newY
+                  selectedEle.x2 = newX+x2-x1
+                  selectedEle.y2 = newY+y2-y1
+                }
+                
+                setElements(updateEle)
+                
+              }
+
+          }          
+          else if(currentTool === 'brush' && action === 'drawing'){
+            setPoints(prev => [...prev, [x,y]])
             
             if(!elements){
               return
@@ -153,20 +423,21 @@ function Canvas() {
             updateEle[n] = newSvg
             setElements(updateEle)
 
-          } 
-          
-          else{
+          }
+          else if(action === 'drawing'){
 
             const tempEle = [...elements]
             const n = tempEle.length-1
             
-            const {x1,y1} = tempEle[n]
-            
+            const {x1,y1,options} = tempEle[n]
+            ctx.translate(0,0)
             const temp = new Shape(ctx)
-            const finalEle = drawElement(temp,currentTool,x1,y1,clientX,clientY)
+            ctx.translate(0,0)
+            const finalEle = drawElement(temp,currentTool,x1,y1,x,y,options)
             
             tempEle[n] = finalEle
-            
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+            temp.draw(tempEle);
             setElements(tempEle)
           }
             
@@ -177,42 +448,60 @@ function Canvas() {
           if(action === 'none'){
             return
           }
+          setMovingElement(null)
           
-          const {clientX, clientY} = e
+          // const {clientX, clientY} = e
+
+          // calculating the coordinates with reference to canvas
+          let x = (e.clientX - panOffset.x*scale + scaleOffsetX)/scale 
+          let y = (e.clientY - panOffset.y*scale + scaleOffsetY)/scale
+          
+          if(e.type === 'touchstart'){
+            x = (e.touches[0].clientX - panOffset.x*scale + scaleOffsetX)/scale 
+            y = (e.touches[0].clientY - panOffset.y*scale + scaleOffsetY)/scale
+          }
+
 
           if(currentTool === 'text'){
             return
           }
-
-          if(currentTool === 'brush'){
-            setPoints(prev => [...prev, [clientX,clientY]])
-
-            const newSvg = drawSVG(points,ctx,options)
-            const n = elements.length-1
-            
-            const updateEle = [...elements]
-            updateEle[n] = newSvg
-            setElements(updateEle)
-          }
           
-          else{
+          if(action === 'drawing'){
 
-            const tempEle = [...elements]
-            const n = tempEle.length-1
+            if(currentTool === 'brush'){
+              setPoints(prev => [...prev, [x,y]])
+              
+              const newSvg = drawSVG(points,ctx,options)
+              const n = elements.length-1
+              
+              const updateEle = [...elements]
+              updateEle[n] = newSvg
+              setElements(updateEle)
+              setPoints([])
+            }
             
-            const {x1,y1} = tempEle[n]
-            
-            const temp = new Shape(ctx)
-            const finalEle = drawElement(temp,currentTool,x1,y1,clientX,clientY)
-            
-            tempEle[n] = finalEle
-            
-            setElements(tempEle)
-            
+            else{
+              
+              const tempEle = [...elements]
+              const n = tempEle.length-1
+              
+              const {x1,y1,options} = tempEle[n]
+              
+              const temp = new Shape(ctx)
+              const finalEle = drawElement(temp,currentTool,x1,y1,x,y,options)
+              
+              tempEle[n] = finalEle
+              
+              setElements(tempEle)
+              
+            }
           }
-          setAction('none')
+            setPoints([])
+            setAction('none')
           return
         }
+
+        localStorage.setItem('elements', JSON.stringify(elements))
 
         const onKeyDown = (e) => {
           if(action !== 'typing'){
@@ -224,8 +513,8 @@ function Canvas() {
             const n = elements.length-1
             
             const currEle = [...elements]
-            const {x,y} = currEle[n]
-            const finalEle = temp.textBox(x,y+40,currText)
+            const {x,y,options} = currEle[n]
+            const finalEle = temp.textBox(x,y+40,currText,options)
 
             currEle[n] = finalEle
             setElements(currEle)
@@ -236,20 +525,33 @@ function Canvas() {
           }
         }
 
+        const handleResize= (e) =>{
+          const storageEle = JSON.parse(localStorage.getItem('elements'))
+          
+          setElements(storageEle)
+          localStorage.clear()
+          
+        }
+
         canvas.addEventListener('mousedown', onMouseDown)
         document.addEventListener('mouseup', onMouseUp)
         canvas.addEventListener('mousemove', onMouseMove)
         document.addEventListener('keydown', onKeyDown)
-
+        window.addEventListener("resize", handleResize)
+      
         return() => {
           canvas.removeEventListener('mousedown', onMouseDown)
           document.removeEventListener('mouseup', onMouseUp)
           canvas.removeEventListener('mousemove', onMouseMove)
           document.removeEventListener('keydown', onKeyDown)
+          window.removeEventListener("resize", handleResize)
 
         }
 
-    },[action,elements,points,currText, currElement, currentTool,scale])
+    },[action,elements,points,currText, currElement, currentTool,scale,strokeWidth,panOffset,stroke])
+
+    // panOffset,elements,currentTool,action,scale
+    // action,elements,points,currText, currElement, currentTool,scale,strokeWidth,panOffset,stroke
 
     useEffect(() => {
       const textInput = inputRef.current
@@ -259,10 +561,11 @@ function Canvas() {
         const n = elements.length-1
         const {x,y} = elements[n]
 
-        textInput.style.top = y
-        textInput.style.left = x
+        // textInput.style.top = y
+        // textInput.style.left = x
       }
     }, [action,currElement])
+
 
     const handleChange = (e) => {
         setCurrText(e.target.value)
@@ -282,8 +585,8 @@ function Canvas() {
     </div> */}
       {
         action === 'typing' && 
-          <input ref={inputRef} className={`bg-white w-auto h-10 z-10 border-none focus:outline-none font-serif text-4xl`}
-           style={{top:currElement.y, left:currElement.x, width: currText.length > 21 ? currText.length*20 : '394px'}}
+          <input ref={inputRef} className={`bg-white w-auto fixed h-10 border-none focus:outline-none font-serif text-4xl`}
+           style={{color: stroke ,top:currElement.realY, left:currElement.realX, width: currText.length > 21 ? currText.length*20 : '394px'}}
            onChange={handleChange} />
 
       }
