@@ -4,163 +4,10 @@ import { Shape } from '../utils/Shape';
 import { getStroke } from 'perfect-freehand'
 import { getSvgPathFromStroke } from '../utils/getSvgPathFromStroke';
 import useDraw from '../context/useDraw';
+import SelectionBox from './SelectionBox';
 
 
-const drawElement= (generator, shape, x1,y1,x2,y2,options) => {
 
-  switch(shape){
-    case "rectangle":
-      return generator.rectangle(x1,y1,x2,y2,options)
-    case "line":
-      return generator.line(x1,y1,x2,y2,options)
-    
-    case "ellipse":
-    return generator.ellipse(x1,y1,x2,y2,options)
-    
-    default:
-      return
-  }
-
-}
-
-const drawSVG = (pts,ctx,options) => {
-  if(!pts || !ctx){
-    return
-  }
-  const thickness=  options.lineWidth >5 ? options.lineWidth : 5
-  
-  const outlinePoints = getStroke(pts,{size: thickness,stroke: options.strokeStyle, fill: options.strokeStyle})
-  const pathData = getSvgPathFromStroke(outlinePoints)
-  const temp = new Shape(ctx)
-  return temp.svg(pathData,pts,options)
-}
-
-function cartesianDistance(x1,y1, x2,y2){
-  return Math.round((Math.sqrt(Math.pow(y2-y1,2) + Math.pow(x2-x1,2))))
-}
-
- // for finding if a element exists on the given point
- const elementFinder = (x,y,element) => {
-  const {x1,y1,x2,y2,type} = element
-
-  // Line -> AB, to check if a point P lies on line => dist(AB) = dist(AP) + dist(PB)
-  if(type === 'line'){
-    const lineDist = cartesianDistance(x1,y1,x2,y2)
-    const pointDist = cartesianDistance(x,y,x1,y1) + cartesianDistance(x,y,x2,y2)
-    if( lineDist === pointDist){
-      return element
-    }
-  }
-  
-  // checking for rectangle and ellipse
-  else if(type === 'rectangle' || type === 'ellipse'){
-    const maxX = Math.max(x1,x2)
-    const maxY = Math.max(y1,y2)
-    const minX = Math.min(x1,x2)
-    const minY = Math.min(y1,y2)
-    
-    // if(action === 'erasing'){
-    //   if((x <= maxX+10 && x >= minX-10 && y<= maxY+10 && y>=minY-10) &&
-    //     ((Math.abs(x-minX) < 10 && y<=maxY && y>=minY) || (Math.abs(x-maxX) < 10 && y<=maxY && y>=minY) || 
-    //     (Math.abs(y-minY) < 10 && x<=maxX && x>=minX) || (Math.abs(y-maxY) < 10 && x<=maxX && x>=minX))){
-    //     return element
-    //   }
-    // }
-    {          
-      if(x <= maxX && x >= minX && y<= maxY && y>=minY){
-        
-        return element
-      }
-      
-    }
-  }
-
-  //if point P lies inside triangle => area(ABC) = area(PAB) + area(PAC) + area(PBC)
-  else if(type === 'triangle'){
-    const {pts} = element
-    const A = pts[0]
-    const B = pts[1]
-    const C = pts[2]
-    const P = [x,y]
-
-    const area = (x1,y1,x2,y2,x3,y3) => {
-      // Area A = [ x1(y2 – y3) + x2(y3 – y1) + x3(y1-y2)]/2 
-      return Math.abs((x1*(y2-y3) + x2*(y3-y1)+ x3*(y1-y2))/2.0)
-    }
-    const originalArea = area(A[0],A[1],B[0],B[1],C[0],C[1])
-    const testArea = area(P[0],P[1],A[0],A[1],B[0],B[1]) + area(P[0],P[1],B[0],B[1],C[0],C[1]) + area(P[0],P[1],A[0],A[1],C[0],C[1])
-
-    if(originalArea === testArea) return  element
-  }
-
-  else if(type=== 'rhombus'){
-    const {pts} = element
-
-    function inside(point, vs) {
-      // ray-casting algorithm based on
-      // https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
-      
-      var x = point[0], y = point[1];
-      
-      var inside = false;
-      for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-          var xi = vs[i][0], yi = vs[i][1];
-          var xj = vs[j][0], yj = vs[j][1];
-          
-          var intersect = ((yi > y) != (yj > y))
-              && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-          if (intersect) inside = !inside;
-      }
-      
-      return inside;
-  }
-
-    if(inside([ x, y ], pts)){
-      return element
-    }
-  }
-  else if(type === 'svg'){
-    
-    const {pointsArr} = element
-
-    for(let i =0; i<pointsArr.length; i++){
-
-      const currX = pointsArr[i][0]
-      const currY = pointsArr[i][1]
-
-      if(Math.abs(currX-x) <=10 && Math.abs(currY-y) <= 10){
-        const obj = {element:element, X: currX, Y: currY}
-        return obj        
-      }
-    }
-
-  }
-
-  else if(type === 'text'){
-    const elX = element.x
-    const elY = element.y-40
-
-    const x1 = elX
-    const y1 = elY
-    const x2 = elX+element.width
-    const y2 = elY+40
-    
-    const maxX = Math.max(x1,x2)
-    const maxY = Math.max(y1,y2)
-    const minX = Math.min(x1,x2)
-    const minY = Math.min(y1,y2)
-
-    if(x <= maxX && x >= minX && y<= maxY && y>=minY){
-      return element
-    }
-  }
-  
-}
-
-//looping through each element and checking if point P lies on the element
-const findElement = (x,y,elements) => {
-  return (elements.find(element => elementFinder(x,y,element)))
-}
 
 
 function Canvas() {
@@ -171,16 +18,17 @@ function Canvas() {
     const [action, setAction] = useState('none')
     const [points,setPoints] = useState([])
     const [movingElement, setMovingElement] = useState(null)
+    const [selectedElement, setSelectedElement] = useState(null)
     const [currText, setCurrText] = useState('')
     const [initialPoints, setInitialPoints] = useState({x:0, y:0})
     const [currElement, setCurrElement] = useState(null)
     const [panOffset, setPanOffset] = useState({x:0, y:0})
     const [scaleOffset,setScaleOffset] = useState({x:0, y:0})
+    // const [isResizing, setIsResizing]= useState(false)
 
     const {elements, setElements,strokeWidth,setStrokeWidth,stroke,setStroke, setRoughness,
       roughness, currentTool,setCurrentTool,elemenHistory, setElementHistory, isMoving, setMoving,scale, setScale,canvasRef} = useDraw()
   
-    
       
       useEffect(()=>{
         const canvas = canvasRef.current
@@ -243,7 +91,7 @@ function Canvas() {
 
           if(currentTool === 'text'){
             setAction("typing")
-            
+            setSelectedElement(null)
             //creating element for text box
             const temp = new Shape(ctx)
             const finalEle = temp.textBox(x,y,currText,options)
@@ -262,12 +110,16 @@ function Canvas() {
               //getting the element at the point x,y
               const currElement = findElement(x,y, elements)  
               if(currElement){
+                currElement.gen = generator
+                setSelectedElement(currElement)
+
+                
                 if(currElement.type ==='svg'){
                   const {pointsArr} = currElement
                   setPoints(pointsArr)
                   let offsetX = pointsArr.map(point => x - point[0]) 
                   let offsetY = pointsArr.map(point => y - point[1])  
-              
+                  
                   setMovingElement([currElement,offsetX,offsetY])
                 }
                 else if(currElement.type === 'text'){
@@ -411,7 +263,7 @@ function Canvas() {
           }          
           else if(currentTool === 'brush' && action === 'drawing'){
             setPoints(prev => [...prev, [x,y]])
-            
+            setSelectedElement(null)
             if(!elements){
               return
             }
@@ -425,7 +277,7 @@ function Canvas() {
 
           }
           else if(action === 'drawing'){
-
+            setSelectedElement(null)
             const tempEle = [...elements]
             const n = tempEle.length-1
             
@@ -465,6 +317,9 @@ function Canvas() {
           if(currentTool === 'text'){
             return
           }
+          if(currentTool !== 'move'){
+            setSelectedElement(null)
+          }
           
           if(action === 'drawing'){
 
@@ -485,10 +340,36 @@ function Canvas() {
               const tempEle = [...elements]
               const n = tempEle.length-1
               
-              const {x1,y1,options} = tempEle[n]
+              const {type,x1,y1,options} = tempEle[n]
               
               const temp = new Shape(ctx)
-              const finalEle = drawElement(temp,currentTool,x1,y1,x,y,options)
+              // let finalEle
+
+              // if (type === "rectangle") {
+              //   const minX = Math.min(x1, x);
+              //   const maxX = Math.max(x1, x);
+              //   const minY = Math.min(y1, y);
+              //   const maxY = Math.max(y1, y);
+              //   finalEle = drawElement(temp,currentTool, minX,minY,maxX,maxY,options)
+
+              // } else {
+              //   if (x1 < x || (x1 === x && y1 < y)) {
+              //     finalEle = drawElement(temp,currentTool, x, y, x1, y1,options)
+              //   } else {
+              //     finalEle = drawElement(temp,currentTool, x1, y1, x, y,options)
+              //   }
+              // }
+
+              let finalEle
+              // console.log(tempEle[n])
+              if(y < y1){
+                finalEle = drawElement(temp,currentTool,x,y,x1,y1,options)
+
+              }
+              else{
+                finalEle = drawElement(temp,currentTool,x1,y1,x,y,options)
+              }
+              // console.log(finalEle)
               
               tempEle[n] = finalEle
               
@@ -558,8 +439,8 @@ function Canvas() {
       if(!textInput)  return
       if(action === 'typing'){
         textInput.focus()
-        const n = elements.length-1
-        const {x,y} = elements[n]
+        // const n = elements.length-1
+        // const {x,y} = elements[n]
 
         // textInput.style.top = y
         // textInput.style.left = x
@@ -590,11 +471,172 @@ function Canvas() {
            onChange={handleChange} />
 
       }
+      {/* {
+        selectedElement && <SelectionBox selectedElement={selectedElement} />
+      } */}
+      
+
       <canvas ref={canvasRef} id='canvas' height={window.innerHeight} width={window.innerWidth} className=' relative'>
       </canvas>
 
     </>
   )
+}
+
+const drawElement= (generator, shape, x1,y1,x2,y2,options) => {
+
+  switch(shape){
+    case "rectangle":
+      return generator.rectangle(x1,y1,x2,y2,options,resize)
+    case "line":
+      return generator.line(x1,y1,x2,y2,options)
+    
+    case "ellipse":
+    return generator.ellipse(x1,y1,x2,y2,options)
+    
+    default:
+      return
+  }
+
+}
+
+const drawSVG = (pts,ctx,options) => {
+  if(!pts || !ctx){
+    return
+  }
+  const thickness=  options.lineWidth >5 ? options.lineWidth : 5
+  
+  const outlinePoints = getStroke(pts,{size: thickness})
+  const pathData = getSvgPathFromStroke(outlinePoints)
+  const temp = new Shape(ctx)
+  return temp.svg(pathData,pts,options)
+}
+
+function cartesianDistance(x1,y1, x2,y2){
+  return Math.round((Math.sqrt(Math.pow(y2-y1,2) + Math.pow(x2-x1,2))))
+}
+
+ // for finding if a element exists on the given point
+ const elementFinder = (x,y,element) => {
+  const {x1,y1,x2,y2,type} = element
+
+  // Line -> AB, to check if a point P lies on line => dist(AB) = dist(AP) + dist(PB)
+  if(type === 'line'){
+    const lineDist = cartesianDistance(x1,y1,x2,y2)
+    const pointDist = cartesianDistance(x,y,x1,y1) + cartesianDistance(x,y,x2,y2)
+    if( lineDist === pointDist){
+      return element
+    }
+  }
+  
+  // checking for rectangle and ellipse
+  else if(type === 'rectangle' || type === 'ellipse'){
+    const maxX = Math.max(x1,x2)
+    const maxY = Math.max(y1,y2)
+    const minX = Math.min(x1,x2)
+    const minY = Math.min(y1,y2)
+    
+    // if(action === 'erasing'){
+    //   if((x <= maxX+10 && x >= minX-10 && y<= maxY+10 && y>=minY-10) &&
+    //     ((Math.abs(x-minX) < 10 && y<=maxY && y>=minY) || (Math.abs(x-maxX) < 10 && y<=maxY && y>=minY) || 
+    //     (Math.abs(y-minY) < 10 && x<=maxX && x>=minX) || (Math.abs(y-maxY) < 10 && x<=maxX && x>=minX))){
+    //     return element
+    //   }
+    // }
+    {          
+      if(x <= maxX && x >= minX && y<= maxY && y>=minY){
+        
+        return element
+      }
+      
+    }
+  }
+
+  //if point P lies inside triangle => area(ABC) = area(PAB) + area(PAC) + area(PBC)
+  else if(type === 'triangle'){
+    const {pts} = element
+    const A = pts[0]
+    const B = pts[1]
+    const C = pts[2]
+    const P = [x,y]
+
+    const area = (x1,y1,x2,y2,x3,y3) => {
+      // Area A = [ x1(y2 – y3) + x2(y3 – y1) + x3(y1-y2)]/2 
+      return Math.abs((x1*(y2-y3) + x2*(y3-y1)+ x3*(y1-y2))/2.0)
+    }
+    const originalArea = area(A[0],A[1],B[0],B[1],C[0],C[1])
+    const testArea = area(P[0],P[1],A[0],A[1],B[0],B[1]) + area(P[0],P[1],B[0],B[1],C[0],C[1]) + area(P[0],P[1],A[0],A[1],C[0],C[1])
+
+    if(originalArea === testArea) return  element
+  }
+
+  else if(type=== 'rhombus'){
+    const {pts} = element
+
+    function inside(point, vs) {
+      // ray-casting algorithm based on
+      // https://wrf.ecse.rpi.edu/Research/Short_Notes/pnpoly.html
+      
+      var x = point[0], y = point[1];
+      
+      var inside = false;
+      for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+          var xi = vs[i][0], yi = vs[i][1];
+          var xj = vs[j][0], yj = vs[j][1];
+          
+          var intersect = ((yi > y) != (yj > y))
+              && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+      }
+      
+      return inside;
+  }
+
+    if(inside([ x, y ], pts)){
+      return element
+    }
+  }
+  else if(type === 'svg'){
+    
+    const {pointsArr} = element
+
+    for(let i =0; i<pointsArr.length; i++){
+
+      const currX = pointsArr[i][0]
+      const currY = pointsArr[i][1]
+
+      if(Math.abs(currX-x) <=10 && Math.abs(currY-y) <= 10){
+        const obj = {element:element, X: currX, Y: currY}
+        return obj        
+      }
+    }
+
+  }
+
+  else if(type === 'text'){
+    const elX = element.x
+    const elY = element.y-40
+
+    const x1 = elX
+    const y1 = elY
+    const x2 = elX+element.width
+    const y2 = elY+40
+    
+    const maxX = Math.max(x1,x2)
+    const maxY = Math.max(y1,y2)
+    const minX = Math.min(x1,x2)
+    const minY = Math.min(y1,y2)
+
+    if(x <= maxX && x >= minX && y<= maxY && y>=minY){
+      return element
+    }
+  }
+  
+}
+
+//looping through each element and checking if point P lies on the element
+const findElement = (x,y,elements) => {
+  return (elements.find(element => elementFinder(x,y,element)))
 }
 
 export default Canvas

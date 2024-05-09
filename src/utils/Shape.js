@@ -32,22 +32,28 @@ export class Shape {
       }
     }
 
-    rectangle(x1,y1,x2,y2,options){
+    rectangle(x1,y1,x2,y2,options,resize){
       if(!this.ctx){
         return;
       }
+      // console.log(resize)
+      // if(resize && resize.type === 'transform'){
+      //   this.ctx.transform(2,0,0,1,0,0)
+      //   console.log(1)
+      // }
 
       this.x1 = x1
       this.y1 = y1
       this.x2 = x2
       this.y2 = y2
-
+      
       this.style(options)
-
+      
       this.type = "rectangle"
       
       this.ctx.beginPath()
       this.ctx.strokeRect(x1,y1,x2-x1,y2-y1)
+
       const ele = {
         id:this.idGen(),
         x1:this.x1,
@@ -58,7 +64,8 @@ export class Shape {
         // ctx: this.ctx,
         options: (options ? options : this.options),
        }
-      
+      //  this.ctx.translate(0,0)
+      // this.ctx.transform(1,0,0,1,0,0)
       return ele
     }
 
@@ -219,7 +226,6 @@ export class Shape {
       }
 
       this.ctx.fill(p)
-
       const ele ={
         id:this.idGen(),
         path: path,
@@ -309,6 +315,19 @@ export class Shape {
 
       })
 
+    }
+
+    move(x,y,element){
+      this.ctx.save()
+      this.ctx.scale(1.5,1.5)
+
+      console.log(element)
+      element.x1 = element.x1/1.5
+      element.y1 = element.y1/1.5
+
+      // this.ctx.translate(x,y)
+      this.draw([element])
+      this.ctx.restore()
     }
 
 }

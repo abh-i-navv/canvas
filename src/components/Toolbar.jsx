@@ -128,7 +128,7 @@ function ToolBar() {
     </div>
     </div>
 
-    <div className='flex absolute bottom-5 right-5' >
+    {/* <div className='flex absolute bottom-5 right-5' >
     <div className='m-2 border-[#322560] border-2 cursor-pointer rounded-lg hover:bg-[#b3aad5] z-10' onClick={() => setScale(prev => Math.max((prev-0.1),0.2))} >
       <FaMinus className='' size={20}/>
     </div>
@@ -136,7 +136,7 @@ function ToolBar() {
     <div className='m-2 cursor-pointer border-[#322560] border-2 rounded-lg hover:bg-[#b3aad5] z-10' onClick={() => setScale(prev => Math.min((prev+0.1),2.5))}>
       <FaPlus className='' size={20}/>
     </div>
-    </div>
+    </div> */}
 
 
     </>
