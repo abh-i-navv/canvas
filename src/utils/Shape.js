@@ -1,9 +1,18 @@
+import { svgPathToPointsArray } from "./svgPathToPoints";
+
 export class Shape {
+
+    idGen(){
+      var randLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+      return randLetter + Date.now();
+    }
 
     constructor(ctx,options) {
       this.ctx = ctx;
       this.options = options
-      this.elements = []  
+      this.elements = [] 
+      this.m = [1,0,0,1,0,0]
+      this.ctx.transform(this.m[0],this.m[1],this.m[2],this.m[3],this.m[4],this.m[5])
     }
 
     getElements(){
@@ -27,31 +36,40 @@ export class Shape {
       }
     }
 
-    rectangle(x1,y1,x2,y2,options){
+    rectangle(x1,y1,x2,y2,options,resize){
       if(!this.ctx){
         return;
       }
+      // console.log(resize)
+      // if(resize && resize.type === 'transform'){
+      //   this.ctx.transform(2,0,0,1,0,0)
+      //   console.log(1)
+      // }
+
       this.x1 = x1
       this.y1 = y1
       this.x2 = x2
       this.y2 = y2
-
+      
       this.style(options)
-
+      
       this.type = "rectangle"
       
       this.ctx.beginPath()
       this.ctx.strokeRect(x1,y1,x2-x1,y2-y1)
+
       const ele = {
+        id:this.idGen(),
         x1:this.x1,
         y1: this.y1,
         x2:this.x2,
         y2:this.y2,
         type: this.type,
-        ctx: this.ctx,
-        options: (options ? options : this.options)
-      }
-      
+        // ctx: this.ctx,
+        options: (options ? options : this.options),
+       }
+      //  this.ctx.translate(0,0)
+      // this.ctx.transform(1,0,0,1,0,0)
       return ele
     }
 
@@ -73,6 +91,7 @@ export class Shape {
       this.ctx.closePath()
       this.ctx.stroke()
       const ele =  {
+        id:this.idGen(),
         x1:this.x1,
         y1: this.y1,
         x2:this.x2,
@@ -99,6 +118,7 @@ export class Shape {
       this.ctx.stroke()
 
       const ele = {
+        id:this.idGen(),
         x1:this.x1,
         y1: this.y1,
         radius:this.radius,
@@ -119,13 +139,17 @@ export class Shape {
       this.type = "ellipse"
       this.style(options)
 
-      const major = Math.max(x2-x1,y2-y1)
-      const minor = Math.min(x2-x1,y2-y1)
+      const ax1 = x2-x1
+      const ax2 = y2-y1
+
+      const major = Math.max(ax1,ax2)
+      const minor = Math.min(ax1,ax2)
 
       this.ctx.beginPath()
-      this.ctx.ellipse((x1+x2)/2, (y1+y2)/2, Math.abs(major), Math.abs(minor), 0, 0, 2 * Math.PI)
+      this.ctx.ellipse((x1+x2)/2, (y1+y2)/2, Math.abs(major)/2, Math.abs(minor)/2, 0, 0, 2 * Math.PI)
       this.ctx.stroke()
       const ele = {
+        id:this.idGen(),
         x1:this.x1,
         y1: this.y1,
         x2: this.x2,
@@ -156,6 +180,7 @@ export class Shape {
       this.ctx.stroke();
 
       const ele = {
+        id:this.idGen(),
         points: pts,
         type: this.type,
         ctx: this.ctx,
@@ -167,19 +192,25 @@ export class Shape {
 
     }
 
-    textBox(x,y,text,width,options){
+    textBox(x,y,text,options,width){
       this.type = "text"
       this.text = text
       this.x = x
       this.y = y
 
+      if(options){
+        this.ctx.fillStyle = options.strokeStyle
+      }
+      this.ctx.textBaseLine = "top"
       this.ctx.font = "48px serif"
       width = width ? width : text.length*100
       this.ctx.fillText(text,x,y,width)
       
       const ele = {
+        id:this.idGen(),
         x: this.x,
         y: this.y,
+        width: width,
         text: this.text,
         type : this.type,
         ctx: this.ctx,
@@ -189,17 +220,47 @@ export class Shape {
       return ele
     }
 
-    svg(path,options){
+    svg(path,pointsArr,options,resize){
+      
       this.type = "svg"
       let p = new Path2D(path)
+      this.ctx.save()
+      this.pointsArr = pointsArr
+
+      // const arr = svgPathToPointsArray(path)
+      // console.log(arr)
+
+      if(resize && resize.type === "translate"){
+        this.ctx.translate(resize.x,resize.y)
+
+        const copyArr = [...pointsArr]
+        const test = svgPathToPointsArray(path)
+
+        // console.log(pointsArr[0])
+        // for(let i =0; i<copyArr.length; i++){
+        //   test[i][0] -= resize.x
+        //   test[i][1] -= resize.y
+        // }
+        this.pointsArr =test
+        // console.log(copyArr[0])
+      }
+      // this.style(options)
+      if(options){
+        this.ctx.fillStyle = options.strokeStyle
+      }
+      
+
       this.ctx.fill(p)
 
       const ele ={
+        id:this.idGen(),
         path: path,
+        pointsArr: this.pointsArr,
         type: this.type,
-        ctx: this.ctx,
         options: (options ? options : this.options)
       }
+      this.ctx.restore()
+      // console.log(ele)
       return ele
     }
 
@@ -215,7 +276,38 @@ export class Shape {
 
         switch(shape){
           case "rectangle":
-            return this.rectangle(el.x1,el.y1,el.x2,el.y2,el.options)
+            const rect = this.rectangle(el.x1,el.y1,el.x2,el.y2,el.options)
+            return rect
+          case "line":
+            return this.line(el.x1,el.y1,el.x2,el.y2,el.options)
+          case "circle":
+            return this.circle(el.x1,el.y1,el.radius,el.options)
+          case "ellipse":
+            return this.ellipse(el.x1,el.y1,el.x2,el.y2,el.options)
+          case "polygon":
+            return this.polygon(el.points,el.options)
+          case "svg":
+            this.ctx.save()
+            const ele = this.svg(el.path,el.pointsArr,el.options,el.resize)
+            this.ctx.restore()
+            return ele
+          case "text":
+            return this.textBox(el.x,el.y,el.text,el.options,el.width)
+
+          default:
+            return
+        }
+
+      })
+    }
+
+    translate(el, x,y){
+      const shape = el.type
+
+        switch(shape){
+          case "rectangle":
+            this.ctx.translate(x,y)
+            return this.rectangle(el.x1,el.y1,el.x2,el.y2,el.options) && this.ctx.setTransform(1, 0, 0, 1, 0, 0);
           case "line":
             return this.line(el.x1,el.y1,el.x2,el.y2,el.options)
           case "circle":
@@ -227,13 +319,11 @@ export class Shape {
           case "svg":
             return this.svg(el.path,el.options)
           case "text":
-            return this.textBox(el.x,el.y,el.text,el.width,el.options)
+            return this.textBox(el.x,el.y,el.text,el.options,el.width)
 
           default:
             return
         }
-
-      })
     }
 
     render(){
@@ -257,6 +347,32 @@ export class Shape {
 
       })
 
+    }
+
+    move(x,y,element){
+      this.ctx.save()
+
+      this.ctx.translate(x,y)
+      this.draw([element])
+      this.ctx.restore()
+    }
+
+    transform(tr){
+      this.m[0] = tr.m[0];
+      this.m[1] = tr.m[1] ;
+      this.m[2] = tr.m[2];
+      this.m[3] = tr.m[3];
+      this.m[4] = tr.m[4];
+      this.m[5] = tr.m[5];
+      this.ctx.transform(this.m[0],this.m[1],this.m[2],this.m[3],this.m[4],this.m[5])
+    }
+    reset(){
+      this.m[0] = 0;
+      this.m[1] = 0 ;
+      this.m[2] = 0;
+      this.m[3] = 0;
+      this.m[4] = 0;
+      this.m[5] = 0;
     }
 
 }
