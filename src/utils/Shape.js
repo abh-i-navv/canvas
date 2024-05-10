@@ -1,3 +1,5 @@
+import { svgPathToPointsArray } from "./svgPathToPoints";
+
 export class Shape {
 
     idGen(){
@@ -9,6 +11,8 @@ export class Shape {
       this.ctx = ctx;
       this.options = options
       this.elements = [] 
+      this.m = [1,0,0,1,0,0]
+      this.ctx.transform(this.m[0],this.m[1],this.m[2],this.m[3],this.m[4],this.m[5])
     }
 
     getElements(){
@@ -216,23 +220,47 @@ export class Shape {
       return ele
     }
 
-    svg(path,pointsArr,options){
+    svg(path,pointsArr,options,resize){
+      
       this.type = "svg"
       let p = new Path2D(path)
-      
+      this.ctx.save()
+      this.pointsArr = pointsArr
+
+      // const arr = svgPathToPointsArray(path)
+      // console.log(arr)
+
+      if(resize && resize.type === "translate"){
+        this.ctx.translate(resize.x,resize.y)
+
+        const copyArr = [...pointsArr]
+        const test = svgPathToPointsArray(path)
+
+        // console.log(pointsArr[0])
+        // for(let i =0; i<copyArr.length; i++){
+        //   test[i][0] -= resize.x
+        //   test[i][1] -= resize.y
+        // }
+        this.pointsArr =test
+        // console.log(copyArr[0])
+      }
       // this.style(options)
       if(options){
         this.ctx.fillStyle = options.strokeStyle
       }
+      
 
       this.ctx.fill(p)
+
       const ele ={
         id:this.idGen(),
         path: path,
-        pointsArr:pointsArr,
+        pointsArr: this.pointsArr,
         type: this.type,
         options: (options ? options : this.options)
       }
+      this.ctx.restore()
+      // console.log(ele)
       return ele
     }
 
@@ -248,7 +276,8 @@ export class Shape {
 
         switch(shape){
           case "rectangle":
-            return this.rectangle(el.x1,el.y1,el.x2,el.y2,el.options)
+            const rect = this.rectangle(el.x1,el.y1,el.x2,el.y2,el.options)
+            return rect
           case "line":
             return this.line(el.x1,el.y1,el.x2,el.y2,el.options)
           case "circle":
@@ -258,7 +287,10 @@ export class Shape {
           case "polygon":
             return this.polygon(el.points,el.options)
           case "svg":
-            return this.svg(el.path,el.options)
+            this.ctx.save()
+            const ele = this.svg(el.path,el.pointsArr,el.options,el.resize)
+            this.ctx.restore()
+            return ele
           case "text":
             return this.textBox(el.x,el.y,el.text,el.options,el.width)
 
@@ -319,15 +351,28 @@ export class Shape {
 
     move(x,y,element){
       this.ctx.save()
-      this.ctx.scale(1.5,1.5)
 
-      console.log(element)
-      element.x1 = element.x1/1.5
-      element.y1 = element.y1/1.5
-
-      // this.ctx.translate(x,y)
+      this.ctx.translate(x,y)
       this.draw([element])
       this.ctx.restore()
+    }
+
+    transform(tr){
+      this.m[0] = tr.m[0];
+      this.m[1] = tr.m[1] ;
+      this.m[2] = tr.m[2];
+      this.m[3] = tr.m[3];
+      this.m[4] = tr.m[4];
+      this.m[5] = tr.m[5];
+      this.ctx.transform(this.m[0],this.m[1],this.m[2],this.m[3],this.m[4],this.m[5])
+    }
+    reset(){
+      this.m[0] = 0;
+      this.m[1] = 0 ;
+      this.m[2] = 0;
+      this.m[3] = 0;
+      this.m[4] = 0;
+      this.m[5] = 0;
     }
 
 }

@@ -5,9 +5,8 @@ import { getStroke } from 'perfect-freehand'
 import { getSvgPathFromStroke } from '../utils/getSvgPathFromStroke';
 import useDraw from '../context/useDraw';
 import SelectionBox from './SelectionBox';
-
-
-
+import { Transform } from '../utils/Transform';
+import { svgPathToPointsArray } from '../utils/svgPathToPoints';
 
 
 function Canvas() {
@@ -24,6 +23,7 @@ function Canvas() {
     const [currElement, setCurrElement] = useState(null)
     const [panOffset, setPanOffset] = useState({x:0, y:0})
     const [scaleOffset,setScaleOffset] = useState({x:0, y:0})
+    const [currCanvas, setCurrCanvas] = useState(null)
     // const [isResizing, setIsResizing]= useState(false)
 
     const {elements, setElements,strokeWidth,setStrokeWidth,stroke,setStroke, setRoughness,
@@ -51,10 +51,20 @@ function Canvas() {
         const scaleOffsetY = (scaleHeight - canvas.height)/2
         setScaleOffset({x:scaleOffsetX, y:scaleOffsetY})
 
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.save()
-        ctx.translate(panOffset.x*scale - scaleOffsetX, panOffset.y*scale -scaleOffsetY)
+        // ctx.translate(panOffset.x*scale - scaleOffsetX, panOffset.y*scale -scaleOffsetY)
         
-        ctx.scale(scale,scale)       
+        // ctx.scale(scale,scale)       
+        // ctx.transform(scale, 0, 0, scale, panOffset.x*scale - scaleOffsetX, panOffset.y*scale -scaleOffsetY)
+        
+        const t = new Transform()
+        t.translate(panOffset.x*scale - scaleOffsetX, panOffset.y*scale -scaleOffsetY)
+        t.scale(scale,scale)
+        const test = t.copy()
+        generator.transform(test)
+
+        // console.log(test)
 
         // var pts=[ [5,5], [100,50], [150,200], [60,500]];
         // const poly = generator.polygon(pts,options)
@@ -83,7 +93,8 @@ function Canvas() {
           // calculating the coordinates with reference to canvas
           let x = (e.clientX - panOffset.x*scale + scaleOffsetX)/scale 
           let y = (e.clientY - panOffset.y*scale + scaleOffsetY)/scale
-          
+          ctx.save()
+
           if(e.type === 'touchstart'){
             x = (e.touches[0].clientX - panOffset.x*scale + scaleOffsetX)/scale 
             y = (e.touches[0].clientY - panOffset.y*scale + scaleOffsetY)/scale
@@ -120,7 +131,7 @@ function Canvas() {
                   let offsetX = pointsArr.map(point => x - point[0]) 
                   let offsetY = pointsArr.map(point => y - point[1])  
                   
-                  setMovingElement([currElement,offsetX,offsetY])
+                  setMovingElement([currElement,offsetX,offsetY,x,y])
                 }
                 else if(currElement.type === 'text'){
                   const offsetX = x-currElement.x
@@ -158,7 +169,9 @@ function Canvas() {
             }
             else{
               const temp = new Shape(ctx,options)
-              
+              setCurrCanvas(temp)
+              // temp.reset()
+              // temp.transform(test)
               const l = drawElement(temp,currentTool,x,y,x,y,options,strokeWidth)
               
               setElements(prev => [...prev,l])
@@ -206,14 +219,40 @@ function Canvas() {
 
             if(type === 'svg'){
               
-              // const updateEle = [...elements]
+              const updateEle = [...elements]
               
               // let pts = [...points]
               // // console.log(updateEle[n])
-              
-              // let offsetX = movingElement[1]
-              // let offsetY = movingElement[2]
+            
+              let offsetX = movingElement[1]
+              let offsetY = movingElement[2]
+              let x1 = movingElement[3]
+              let y1 = movingElement[4]
 
+              const newEle = {...selectedElement}
+
+              ctx.save()
+
+              const re = {
+                type: "translate",
+                x:x-x1,
+                y:y-y1
+              }
+              newEle.resize = re
+              // console.log(newEle)
+              // generator.draw([newEle])
+
+              // generator.move(x-x1,y-y1,newEle)
+
+              // ctx.transform(1, 0, 0, 1, x-x1, y-y1)
+              // ctx.translate(x-x1,y-y1)
+              // console.log(x+offsetX[0],y+offsetY[0])
+              
+              // generator.draw([selectedElement])
+
+              ctx.restore()
+
+              // console.log(selectedElement)
               
               // for(let  i=0; i < pts.length; i++){
               //   pts[i][0] = x-offsetX[i]
@@ -222,9 +261,9 @@ function Canvas() {
 
               // const newSvg = drawSVG(pts,ctx,options)
               
-              // updateEle[n] = newSvg
-              // setElements(updateEle)
-
+              updateEle[n] = newEle
+              setElements(updateEle)
+              generator.draw(elements)
               // console.log(selectedEle,pts)
 
               // setPoints(pointsArr)
@@ -260,37 +299,50 @@ function Canvas() {
                 
               }
 
-          }          
-          else if(currentTool === 'brush' && action === 'drawing'){
-            setPoints(prev => [...prev, [x,y]])
-            setSelectedElement(null)
-            if(!elements){
-              return
-            }
-
-            const newSvg = drawSVG(points,ctx,options)
-            const n = elements.length-1
-            
-            const updateEle = [...elements]
-            updateEle[n] = newSvg
-            setElements(updateEle)
-
           }
           else if(action === 'drawing'){
-            setSelectedElement(null)
-            const tempEle = [...elements]
-            const n = tempEle.length-1
-            
-            const {x1,y1,options} = tempEle[n]
-            ctx.translate(0,0)
-            const temp = new Shape(ctx)
-            ctx.translate(0,0)
-            const finalEle = drawElement(temp,currentTool,x1,y1,x,y,options)
-            
-            tempEle[n] = finalEle
+
+            if(currentTool === 'brush' && action === 'drawing'){
+              setPoints(prev => [...prev, [x,y]])
+              setSelectedElement(null)
+              if(!elements){
+                return
+              }
+              const newSvg = drawSVG(points,ctx,options)
+              const n = elements.length-1
+              
+              const updateEle = [...elements]
+              updateEle[n] = newSvg
+              setElements(updateEle)
+              // generator.draw(elements)
+            }
+            else if(action === 'drawing'){
+              setSelectedElement(null)
+              const tempEle = [...elements]
+              const n = tempEle.length-1
+              
+              const {x1,y1,options} = tempEle[n]
+              const temp = new Shape(ctx,options)
+              
+              const finalEle = drawElement(temp,currentTool,x1,y1,x,y,options)
+              tempEle[n] = finalEle
+              setElements(tempEle)
+              
+            }          
             ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
-            temp.draw(tempEle);
-            setElements(tempEle)
+            
+            ctx.save()
+            
+            const t = new Transform()
+            t.translate(panOffset.x*scale - scaleOffsetX, panOffset.y*scale -scaleOffsetY)
+            t.scale(scale,scale)
+            const test = t.copy()
+            generator.transform(test)
+            
+            generator.draw(elements);
+            
+            ctx.restore()
+            
           }
             
         }
@@ -301,6 +353,7 @@ function Canvas() {
             return
           }
           setMovingElement(null)
+          ctx.restore()
           
           // const {clientX, clientY} = e
 
@@ -471,9 +524,9 @@ function Canvas() {
            onChange={handleChange} />
 
       }
-      {/* {
+      {
         selectedElement && <SelectionBox selectedElement={selectedElement} />
-      } */}
+      }
       
 
       <canvas ref={canvasRef} id='canvas' height={window.innerHeight} width={window.innerWidth} className=' relative'>
@@ -487,7 +540,7 @@ const drawElement= (generator, shape, x1,y1,x2,y2,options) => {
 
   switch(shape){
     case "rectangle":
-      return generator.rectangle(x1,y1,x2,y2,options,resize)
+      return generator.rectangle(x1,y1,x2,y2,options)
     case "line":
       return generator.line(x1,y1,x2,y2,options)
     
@@ -598,13 +651,15 @@ function cartesianDistance(x1,y1, x2,y2){
   }
   else if(type === 'svg'){
     
-    const {pointsArr} = element
-
-    for(let i =0; i<pointsArr.length; i++){
-
-      const currX = pointsArr[i][0]
-      const currY = pointsArr[i][1]
-
+    const {pointsArr,path} = element
+    const newArr = svgPathToPointsArray(path)
+    console.log(element)
+    
+    for(let i =0; i<newArr.length; i++){
+      
+      const currX = newArr[i][0]
+      const currY = newArr[i][1]
+      
       if(Math.abs(currX-x) <=10 && Math.abs(currY-y) <= 10){
         const obj = {element:element, X: currX, Y: currY}
         return obj        
